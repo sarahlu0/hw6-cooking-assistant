@@ -1,0 +1,1770 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cooking Buddy</title>
+<style>
+  /* ---------- Colors (light and dark) ---------- */
+  :root {
+    --bg: #f6f4ee;
+    --card: #ffffff;
+    --text: #111111;
+    --muted: #4a4a4a;
+    --border: #222222;
+    --accent: #0b57d0;
+    --accent-text: #ffffff;
+    --question-bg: #fff4c2;
+    --alert-bg: #fde4e4;
+    --alert-text: #7a0b0b;
+    --listening: #0a7a2f;
+    --speaking: #8a4b00;
+    --off: #6b6b6b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121212;
+      --card: #1e1e1e;
+      --text: #f4f4f4;
+      --muted: #c4c4c4;
+      --border: #e6e6e6;
+      --accent: #8ab4ff;
+      --accent-text: #0b0b0b;
+      --question-bg: #3d3300;
+      --alert-bg: #4a1414;
+      --alert-text: #ffd6d6;
+      --listening: #5fd38a;
+      --speaking: #ffb35c;
+      --off: #9a9a9a;
+    }
+  }
+
+  /* ---------- Layout ---------- */
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    font-size: 1.25rem;
+    line-height: 1.45;
+  }
+  main { max-width: 900px; margin: 0 auto; padding: 16px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 2rem; margin: 8px 0; }
+  h2 { font-size: 1.3rem; margin: 0 0 8px; }
+
+  .status {
+    font-weight: 700;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 3px solid currentColor;
+    color: var(--off);
+  }
+  .status.listening { color: var(--listening); }
+  .status.speaking { color: var(--speaking); }
+
+  .alert {
+    background: var(--alert-bg);
+    color: var(--alert-text);
+    border: 3px solid currentColor;
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin: 12px 0;
+    font-weight: 600;
+  }
+
+  .start {
+    display: block;
+    width: 100%;
+    margin: 16px 0;
+    padding: 28px 16px;
+    font-size: 2.6rem;
+    font-weight: 800;
+    color: var(--accent-text);
+    background: var(--accent);
+    border: none;
+    border-radius: 18px;
+    cursor: pointer;
+  }
+  .start:focus-visible { outline: 5px solid var(--text); outline-offset: 4px; }
+
+  .card {
+    background: var(--card);
+    border: 4px solid var(--border);
+    border-radius: 18px;
+    padding: 24px;
+    margin: 16px 0;
+  }
+  .counter { font-size: 1.4rem; font-weight: 700; color: var(--muted); }
+  .instruction {
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 800;
+    line-height: 1.25;
+    margin: 12px 0 0;
+  }
+  .question {
+    background: var(--question-bg);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-top: 16px;
+    font-size: 1.6rem;
+    font-weight: 700;
+  }
+  .timer { font-size: 2.4rem; font-weight: 800; margin-top: 16px; font-variant-numeric: tabular-nums; }
+
+  .heard { color: var(--muted); font-size: 1.1rem; margin: 8px 0 16px; min-height: 1.6em; }
+  .heard .live { font-style: italic; }
+
+  .controls {
+    border: 2px dashed var(--muted);
+    border-radius: 12px;
+    padding: 16px;
+    display: grid;
+    gap: 14px;
+    font-size: 1.1rem;
+  }
+  .controls .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .controls select, .controls input[type="text"], .controls button {
+    font-size: 1.1rem;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 2px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+  }
+  .controls select { max-width: 100%; }
+  .controls input[type="text"] { flex: 1 1 220px; min-width: 0; }
+  .controls button { cursor: pointer; font-weight: 700; }
+  .controls input[type="checkbox"] { width: 1.3rem; height: 1.3rem; vertical-align: middle; }
+
+  .log-box { margin-top: 20px; }
+  #log {
+    list-style: none;
+    margin: 0;
+    padding: 12px;
+    max-height: 320px;
+    overflow-y: auto;
+    background: var(--card);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    font-size: 1.05rem;
+  }
+  #log li { padding: 4px 0; border-bottom: 1px solid color-mix(in srgb, var(--muted) 25%, transparent); }
+  #log li:last-child { border-bottom: none; }
+  #log .who { font-weight: 700; margin-right: 6px; }
+  #log .user .who { color: var(--listening); }
+  #log .app .who { color: var(--speaking); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Cooking Buddy</h1>
+    <span id="status" class="status" role="status">Press Start</span>
+  </header>
+
+  <div id="alert" class="alert" role="alert" hidden></div>
+
+  <button id="startBtn" class="start" type="button">Start</button>
+
+  <section class="card" aria-live="polite">
+    <div id="stepCounter" class="counter">Press Start to begin</div>
+    <p id="instruction" class="instruction">Press Start, then tell me what you want to cook.</p>
+    <div id="question" class="question" hidden></div>
+    <div id="timer" class="timer" hidden></div>
+  </section>
+
+  <div class="heard">I heard: <span id="caption">nothing yet</span></div>
+
+  <section class="controls" aria-label="Testing controls">
+    <div class="row">
+      <label><input type="checkbox" id="demoMode"> Demo mode (20-second timer, stir reminder every 6 seconds)</label>
+    </div>
+    <div class="row">
+      <label for="jumpSelect">Jump to step</label>
+      <select id="jumpSelect"></select>
+      <button id="resetBtn" type="button">Reset</button>
+    </div>
+    <form id="typeForm" class="row" autocomplete="off">
+      <label for="typeInput">Type a command</label>
+      <input id="typeInput" type="text" placeholder="For example: done, repeat, where was I">
+      <button type="submit">Send</button>
+    </form>
+  </section>
+
+  <section class="log-box">
+    <h2>Conversation</h2>
+    <ol id="log"></ol>
+  </section>
+</main>
+
+<script>
+'use strict';
+
+/* =====================================================================
+   COOKING BUDDY
+   A voice-guided turkey chili recipe. Audio first: after pressing
+   Start, the cook never has to look at or touch the screen.
+
+   Sections in this file:
+     1. Settings
+     2. The recipe (every step and what to say)
+     3. Words we listen for
+     4. Saving and loading (localStorage)
+     5. App state
+     6. Talking (speechSynthesis)
+     7. Listening (SpeechRecognition + waiting for silence)
+     8. Understanding what was said
+     9. The conversation (what to do with each thing he says)
+    10. Moving through steps, the timer, the burner record
+    11. The screen
+    12. Buttons and controls
+    13. Start-up
+   ===================================================================== */
+
+
+/* =====================================================================
+   1. SETTINGS
+   ===================================================================== */
+
+const SPEECH_RATE = 0.85;            // slow, calm speech
+const SILENCE_MS = 2500;             // act only after 2.5 s of quiet after his last word
+const RESUME_LISTEN_DELAY_MS = 400;  // short gap after talking so we don't hear our own echo
+const SAFE_TEMP_F = 165;             // ground turkey is safe at 165°F
+const PLAUSIBLE_TEMP = { min: 32, max: 300 }; // ignore numbers that can't be a food temperature
+
+const TIMER_REAL = { totalMs: 10 * 60 * 1000, reminderMs: 3 * 60 * 1000 };
+const TIMER_DEMO = { totalMs: 20 * 1000, reminderMs: 6 * 1000 };
+
+const STORAGE_KEYS = {
+  progress: 'cookingBuddy.progress.v1',  // current step + confirmed steps
+  burner: 'cookingBuddy.burnerOff.v1',   // when he last confirmed the burner was off
+  demo: 'cookingBuddy.demoMode.v1',      // demo mode checkbox
+};
+
+
+/* =====================================================================
+   2. THE RECIPE
+   Each step has:
+     key      - a short id used in code
+     short    - name used in questions: "Did you want me to repeat the ___ step?"
+     text     - what we say for the step (one or two short sentences)
+     simpler  - an easier way to say it, for "I don't understand"
+     past     - past tense, for "You told me you ___."
+     type     - how the step is finished:
+                  'done'        say done / finished / okay ... (default)
+                  'ready'       say ready (used before the temperature check)
+                  'temp'        say a temperature number
+                  'timer'       finishes by itself when the timer ends
+                  'burnerCheck' answer yes / no
+                  'wait'        say I'm back / ready / done (after dinner)
+     intro    - (optional) said once before the step, to start a group
+     plain    - (optional) plain version of the step, used when we read it
+                as the "last step" or "next step" (so it doesn't ask a question)
+     doneWords- (optional) extra words that mean "finished" for this step
+     effect   - (optional) 'burnerOn' or 'burnerOff' (see section 10)
+   ===================================================================== */
+
+// Extra "finished" words for the "get the ___" steps.
+const GATHER_WORDS = ['i got', 'got it', 'got the', 'got one', 'i have it', 'i have the', 'found it', 'i found', 'here it is', 'i see it'];
+const ADDED_WORDS = ['its in', 'it is in', 'in the pot', 'added', 'added it', 'put it in', 'poured it'];
+
+const STEPS = [
+  { key: 'wash1', short: 'hand washing',
+    text: 'Wash your hands with soap and water for 20 seconds.',
+    simpler: 'Wash your hands with soap. Count slowly to 20. Then dry them.',
+    past: 'washed your hands',
+    doneWords: ['washed', 'washed them', 'my hands are clean', 'clean'] },
+
+  // ----- Equipment, one item per step -----
+  { key: 'getPot', short: 'pot', intro: "Now let's get your tools, one at a time.",
+    text: 'Get a large pot.',
+    simpler: 'Find the big pot. Put it on the counter.',
+    past: 'got the large pot', doneWords: GATHER_WORDS },
+  { key: 'getCookingSpoon', short: 'cooking spoon',
+    text: 'Get a cooking spoon.',
+    simpler: 'Find a big spoon for stirring.',
+    past: 'got the cooking spoon', doneWords: GATHER_WORDS },
+  { key: 'getTablespoon', short: 'tablespoon',
+    text: 'Get a tablespoon measure.',
+    simpler: 'Find the measuring spoon that says tablespoon. It is the bigger measuring spoon.',
+    past: 'got the tablespoon measure', doneWords: GATHER_WORDS },
+  { key: 'getCanOpener', short: 'can opener',
+    text: 'Get a can opener.',
+    simpler: 'Find the tool that opens cans.',
+    past: 'got the can opener', doneWords: GATHER_WORDS },
+  { key: 'getThermometer', short: 'thermometer',
+    text: 'Get your talking food thermometer.',
+    simpler: 'Find the thermometer that talks. It tells you how hot food is.',
+    past: 'got your thermometer', doneWords: GATHER_WORDS },
+  { key: 'getLadle', short: 'ladle',
+    text: 'Get a ladle.',
+    simpler: 'A ladle is a big spoon shaped like a cup. It is for soup.',
+    past: 'got the ladle', doneWords: GATHER_WORDS },
+  { key: 'getBowl', short: 'bowl',
+    text: 'Get a bowl.',
+    simpler: 'Find a bowl to eat from.',
+    past: 'got a bowl', doneWords: GATHER_WORDS },
+  { key: 'getEatingSpoon', short: 'eating spoon',
+    text: 'Get a spoon to eat with.',
+    simpler: 'Find a regular spoon for eating.',
+    past: 'got your eating spoon', doneWords: GATHER_WORDS },
+  { key: 'getContainer', short: 'container',
+    text: 'Get a container for leftovers.',
+    simpler: 'Find a box with a lid. It is for the extra chili.',
+    past: 'got a container for leftovers', doneWords: GATHER_WORDS },
+
+  // ----- Ingredients, one per step -----
+  { key: 'getTomatoes', short: 'tomato can', intro: "Now let's get the food, one at a time.",
+    text: 'Get one 14-ounce can of diced tomatoes.',
+    simpler: 'Find the can of tomatoes. The label has tomatoes on it.',
+    past: 'got the can of tomatoes', doneWords: GATHER_WORDS },
+  { key: 'getBeans', short: 'bean can',
+    text: 'Get one 15-ounce can of kidney beans.',
+    simpler: 'Find the can of red beans. The label says kidney beans.',
+    past: 'got the can of beans', doneWords: GATHER_WORDS },
+  { key: 'getSeasoning', short: 'seasoning jar',
+    text: 'Get the chili seasoning.',
+    simpler: 'Find the chili spice. It may be a packet or a jar.',
+    past: 'got the chili seasoning', doneWords: GATHER_WORDS },
+  { key: 'getOil', short: 'oil bottle',
+    text: 'Get the cooking oil.',
+    simpler: 'Find the bottle of cooking oil.',
+    past: 'got the cooking oil', doneWords: GATHER_WORDS },
+  { key: 'getTurkey', short: 'turkey',
+    text: 'Last, get one pound of thawed ground turkey from the fridge.',
+    simpler: 'Get the package of ground turkey from the fridge. It should be soft, not frozen.',
+    past: 'got the ground turkey', doneWords: GATHER_WORDS },
+
+  // ----- Cooking -----
+  { key: 'openTomatoes', short: 'tomato opening',
+    text: 'Open the can of tomatoes carefully. Keep the liquid in the can.',
+    simpler: 'Use the can opener on the tomatoes. Go slow. The edge is sharp. Do not pour out the juice.',
+    past: 'opened the tomatoes', doneWords: ['opened', 'opened it', 'its open', 'it is open'] },
+  { key: 'openBeans', short: 'bean opening',
+    text: 'Open the can of beans carefully. Keep the liquid in the can.',
+    simpler: 'Use the can opener on the beans. Go slow. The edge is sharp. Do not pour out the juice.',
+    past: 'opened the beans', doneWords: ['opened', 'opened it', 'its open', 'it is open'] },
+  { key: 'potOnBurner', short: 'pot on the burner',
+    text: 'Put the pot on a burner. Turn the handle away from the edge.',
+    simpler: 'Put the pot on the stove. Turn the handle so it points in, where you will not bump it.',
+    past: 'put the pot on the burner', doneWords: ['its on', 'on the stove', 'on the burner'] },
+  { key: 'oilInPot', short: 'oil',
+    text: 'Put one tablespoon of oil in the pot.',
+    simpler: 'Fill the tablespoon with oil. Then pour it into the pot.',
+    past: 'put the oil in the pot', doneWords: ADDED_WORDS },
+  { key: 'turkeyInPot', short: 'turkey in the pot',
+    text: 'Put the turkey in the pot.',
+    simpler: 'Open the turkey package. Put all the meat in the pot.',
+    past: 'put the turkey in the pot', doneWords: ADDED_WORDS },
+  { key: 'trash', short: 'trash',
+    text: 'Throw away the empty package.',
+    simpler: 'Put the empty turkey package in the trash can.',
+    past: 'threw away the package', doneWords: ['threw it away', 'in the trash', 'thrown away', 'threw it out'] },
+  { key: 'wash2', short: 'hand washing',
+    text: 'Wash your hands with soap and water for 20 seconds.',
+    simpler: 'You touched raw meat. Wash your hands with soap. Count slowly to 20.',
+    past: 'washed your hands again',
+    doneWords: ['washed', 'washed them', 'my hands are clean', 'clean'] },
+  { key: 'burnerMedium', short: 'burner on medium', effect: 'burnerOn',
+    text: 'Turn the burner under the pot to medium.',
+    simpler: 'Find the knob for the burner under the pot. Turn it to the middle. That is medium.',
+    past: 'turned the burner to medium', doneWords: ['its on', 'on medium', 'its medium', 'turned it on'] },
+  { key: 'cookTurkey', short: 'cooking turkey', type: 'ready',
+    text: "Break the turkey into small pieces with your spoon. Stir often as it cooks. Tell me when you're ready to check the temperature.",
+    simpler: 'Use the spoon to chop the meat into little pieces. Keep stirring. When the meat looks brown, say ready.',
+    plain: 'Break the turkey into small pieces with your spoon, and stir it as it cooks.',
+    past: 'cooked the turkey' },
+  { key: 'temp1', short: 'first temperature', type: 'temp',
+    text: 'Check a thick piece of turkey with your thermometer, without touching the pot. Tell me the temperature.',
+    simpler: 'Push the thermometer into a big piece of meat. Do not touch the hot pot. Tell me the number it says.',
+    plain: 'Check the temperature of a thick piece of turkey.',
+    past: 'checked the turkey temperature' },
+  { key: 'temp2', short: 'second temperature', type: 'temp',
+    text: 'Now check a different thick piece with your thermometer, without touching the pot. Tell me the temperature.',
+    simpler: 'Push the thermometer into a different big piece of meat. Do not touch the hot pot. Tell me the number it says.',
+    plain: 'Check the temperature of a different thick piece of turkey.',
+    past: 'checked the temperature again' },
+  { key: 'addTomatoes', short: 'adding tomatoes',
+    text: 'Add the tomatoes and their liquid to the pot.',
+    simpler: 'Pour the whole can of tomatoes, with the juice, into the pot.',
+    past: 'added the tomatoes', doneWords: ADDED_WORDS },
+  { key: 'addBeans', short: 'adding beans',
+    text: 'Add the beans and their liquid to the pot.',
+    simpler: 'Pour the whole can of beans, with the juice, into the pot.',
+    past: 'added the beans', doneWords: ADDED_WORDS },
+  { key: 'addSeasoning', short: 'adding seasoning',
+    text: 'Add one tablespoon of chili seasoning.',
+    simpler: 'Fill the tablespoon with chili spice. Put it in the pot.',
+    past: 'added the seasoning', doneWords: ADDED_WORDS },
+  { key: 'stir', short: 'stirring',
+    text: "Stir the chili until it's mixed.",
+    simpler: 'Use the cooking spoon. Stir until it all looks the same.',
+    past: 'stirred the chili', doneWords: ['mixed', 'its mixed', 'stirred', 'stirred it'] },
+  { key: 'bubbles', short: 'bubbles',
+    text: 'Keep heating and stirring until you see gentle bubbles.',
+    simpler: 'Keep stirring. Watch for small bubbles on top. Then say done.',
+    past: 'heated the chili until it bubbled',
+    doneWords: ['bubbles', 'bubbling', 'i see bubbles', 'its bubbling', 'bubbly', 'boiling'] },
+  { key: 'burnerLow', short: 'burner on low',
+    text: 'Turn the burner to low.',
+    simpler: 'Turn the burner knob down to low.',
+    past: 'turned the burner to low', doneWords: ['its low', 'on low', 'its on low', 'turned it down'] },
+  { key: 'simmer', short: 'simmer', type: 'timer',
+    text: "Let the chili cook gently for 10 minutes. I'll time it and remind you to stir.",
+    simpler: 'Leave the chili on low. I will watch the clock. I will tell you when to stir.',
+    plain: 'Let the chili cook gently for 10 minutes.',
+    past: 'let the chili simmer for 10 minutes' },
+  { key: 'burnerOff', short: 'burner off',
+    text: 'The 10 minutes are up. Turn the burner under the pot to OFF.',
+    simpler: 'Find the knob for the burner under the pot. Turn it all the way to OFF.',
+    plain: 'Turn the burner under the pot to OFF.',
+    past: 'turned the burner off',
+    doneWords: ['off', 'its off', 'turned it off', 'turned off', 'shut it off'] },
+  { key: 'burnerCheck', short: 'burner check', type: 'burnerCheck', effect: 'burnerOff',
+    text: "Check that the burner's knob is at OFF. Is it at OFF?",
+    simpler: 'Look at the knob. Does it point to OFF? Say yes or no.',
+    plain: "Check that the burner's knob is at OFF.",
+    past: 'checked that the burner is off',
+    confirmMessage: 'I saved your confirmation that the burner is off. The stove and pot are still hot.' },
+  { key: 'bowlOnCounter', short: 'bowl on the counter',
+    text: 'Put your bowl on the counter next to the pot.',
+    simpler: 'Put your empty bowl on the counter, close to the pot.',
+    past: 'put your bowl next to the pot', doneWords: ['its there', 'its on the counter'] },
+  { key: 'serve', short: 'serving',
+    text: 'Use the ladle to put chili in your bowl. The pot and chili are still hot.',
+    simpler: 'Scoop chili with the ladle. Put it in your bowl. Be careful. It is hot.',
+    past: 'put chili in your bowl', doneWords: ['in my bowl', 'in the bowl', 'got some'] },
+  { key: 'eat', short: 'dinner', type: 'wait',
+    text: "Enjoy your dinner! Tell me when you're ready to put the leftovers away.",
+    simpler: "Eat your chili. When you finish eating, say I'm back.",
+    plain: 'Eat your dinner.',
+    past: 'ate your dinner',
+    doneWords: ['back', 'im full', 'full', 'i ate', 'ate it', 'finished eating', 'done eating'] },
+  { key: 'leftovers', short: 'leftovers',
+    text: 'Put the leftover chili in the container. Put it in the fridge soon.',
+    simpler: 'Use the ladle to fill the container with chili. Put the lid on. Put it in the fridge.',
+    past: 'put the leftovers away', doneWords: ['in the fridge', 'put it away', 'put away'] },
+  { key: 'dishes', short: 'dishes',
+    text: 'Put your dishes in the sink. The pot may still be hot.',
+    simpler: 'Take your bowl and spoons to the sink. Be careful with the pot. It may be hot.',
+    past: 'put your dishes in the sink', doneWords: ['in the sink'] },
+  { key: 'wipe', short: 'counter',
+    text: 'Wipe the counter.',
+    simpler: 'Use a wet cloth or paper towel. Wipe the counter clean.',
+    past: 'wiped the counter', doneWords: ['wiped', 'wiped it', 'its clean', 'clean'] },
+];
+STEPS.forEach(step => { step.type = step.type || 'done'; });
+
+const STEP_INDEX = Object.fromEntries(STEPS.map((step, i) => [step.key, i]));
+
+const RECIPE_INTRO = [
+  'Say done when you finish each step.',
+  "You can say repeat, go back, where was I, or what's next anytime.",
+];
+const ALL_DONE = 'All done! Great job making dinner.';
+const NOT_CAUGHT = "Sorry, I didn't catch that. You can say done, repeat, or where was I.";
+const PRAISE = ['Great job.', 'Nice work.', 'Good.', 'Great.'];
+
+
+/* =====================================================================
+   3. WORDS WE LISTEN FOR
+   All phrases are matched as whole words anywhere in what he said,
+   after removing punctuation and apostrophes ("what's" -> "whats").
+   ===================================================================== */
+
+// Clear commands, checked in this order (the first match wins).
+const COMMAND_ORDER = ['hurt', 'fire', 'whereWasI', 'goBack', 'whatsNext', 'notReady',
+                       'problem', 'simpler', 'repeat', 'ready', 'done'];
+
+const PHRASES = {
+  hurt: ['hurt', 'i burned', 'burned myself', 'burned my', 'burnt myself', 'cut myself', 'bleeding', 'ouch', 'ow'],
+  fire: ['fire', 'flames', 'smoke', 'smoking', 'smoky'],
+  whereWasI: ['where was i', 'where am i', 'where were we', 'where are we', 'what was i doing',
+              'what am i doing', 'what was i', 'what step', 'which step', 'lost my place', 'forgot where',
+              'i forgot', 'where i was'],
+  goBack: ['go back', 'back up', 'last step', 'previous', 'step before', 'before that',
+           'the one before', 'last one', 'go backwards', 'what did i just do'],
+  whatsNext: ['whats next', 'what is next', 'what comes next', 'whats after', 'what is after',
+              'what do i do next', 'what next', 'whats the next', 'what happens next', 'after this',
+              'whats coming'],
+  notReady: ['not ready', 'wait', 'weight', 'hold on', 'hang on', 'one second', 'one sec', 'a second',
+             'a minute', 'one minute', 'just a second', 'just a minute', 'give me a', 'not yet',
+             'not done', 'not finished', 'im not', 'still working', 'still doing', 'pause', 'stop',
+             'need more time', 'be right back'],
+  problem: ['cant find', 'cannot find', 'can not find', 'dont have', 'do not have', 'cant see',
+            'where is', 'wheres the', 'cant open', 'wont open', 'cannot open', 'stuck', 'spilled',
+            'i dropped', 'dropped it', 'broke', 'broken'],
+  simpler: ['dont understand', 'do not understand', 'dont get it', 'explain', 'im lost', 'lost',
+            'simpler', 'simple', 'easier', 'what does that mean', 'what does it mean', 'what do you mean',
+            'what is that', 'whats that', 'confused', 'confusing', 'dont know how', 'how do i',
+            'how do you', 'help', 'show me'],
+  repeat: ['repeat', 'say that again', 'say it again', 'again', 'what', 'huh', 'didnt hear',
+           'did not hear', 'didnt catch', 'pardon', 'come again', 'one more time', 'what did you say',
+           'sorry', 'i missed', 'excuse me'],
+  ready: ['ready', 'im ready', 'i am ready', 'im back', 'i am back', 'lets check', 'ready to check',
+          'check it now', 'check the temperature', 'lets go', 'lets do it', 'go ahead'],
+  done: ['done', 'im done', 'i am done', 'all done', 'finished', 'finish', 'i finished', 'okay', 'ok',
+         'okey', 'got it', 'i got it', 'gotcha', 'its in', 'it is in', 'did it', 'i did it', 'i did',
+         'all set', 'complete', 'completed', 'alright', 'all right', 'thats it', 'good to go'],
+};
+
+// Any of these turns a "done" into "not sure": "I don't have it", "I can't".
+const NEGATIONS = ['not', 'dont', 'didnt', 'cant', 'cannot', 'havent', 'isnt', 'wont', 'no',
+                   'never', 'nope', 'nah', 'couldnt', 'arent', 'wasnt'];
+
+const YES_WORDS = ['yes', 'yeah', 'yea', 'yep', 'yup', 'ya', 'yah', 'sure', 'right', 'correct',
+                   'thats right', 'uh huh', 'mhm', 'mm hmm', 'okay', 'ok', 'i think so', 'it is',
+                   'yes please', 'please', 'do it', 'true', 'absolutely', 'of course', 'definitely',
+                   'exactly', 'i did', 'i do', 'you got it', 'sounds good', 'go ahead', 'alright', 'all right'];
+const NO_WORDS = ['no', 'nope', 'nah', 'not', 'wrong', 'dont', 'didnt', 'isnt', 'wasnt', 'incorrect',
+                  'negative', 'never', 'cant'];
+
+// For "Is it at OFF?": "it's off" means yes, "it's on" means no.
+const BURNER_YES = ['off', 'its off', 'it is off', 'at off', 'turned off', 'turned it off', 'shut off'];
+const BURNER_NO = ['on', 'its on', 'still on', 'low', 'medium', 'high'];
+
+const RECIPE_WORDS = ['chili', 'chilli', 'chile', 'chilly', 'chilis', 'chilies', 'chillies', 'turkey'];
+
+// Near-misses: words that are probably a command he said unclearly.
+// These never act directly. They make us ASK a yes/no question first.
+const GUESS_ORDER = ['repeat', 'simpler', 'goBack', 'whereWasI', 'whatsNext', 'notReady', 'ready', 'done'];
+const GUESS_PHRASES = {
+  repeat: ['peat', 'pete', 'beat', 'feet', 'receipt', 'retreat', 'reheat', 'repeal', 'repeats',
+           'we eat', 'report', 'replay', 'the peat'],
+  simpler: ['symbol', 'sampler', 'similar', 'simper', 'sample', 'understand', 'meaning', 'mean'],
+  goBack: ['back', 'bag', 'pack', 'black', 'go bag', 'before', 'previous one'],
+  whereWasI: ['where', 'wear', 'where was', 'ware'],
+  whatsNext: ['whats', 'what else', 'then what', 'and then what'],
+  notReady: ['hold', 'hang', 'minute', 'second', 'later', 'moment', 'slow'],
+  ready: ['reddy', 'red', 'eddie', 'betty', 'freddy', 'teddy', 'read', 'rady', 'redy', 'already', 'steady'],
+  done: ['dun', 'dunn', 'don', 'dawn', 'dumb', 'none', 'nun', 'fun', 'gun', 'son', 'sun', 'duh',
+         'finnish', 'fished', 'finest', 'vanished', 'yes', 'yeah', 'yep', 'yup', 'sure', 'uh huh',
+         'mhm', 'next', 'necks', 'next one', 'go on', 'move on', 'continue', 'keep going'],
+};
+// For short sentences, a word that is 1-2 letters off from one of these is also a guess.
+const FUZZY_KEYS = {
+  repeat: ['repeat', 'again'],
+  simpler: ['simpler', 'explain'],
+  goBack: ['back', 'previous'],
+  notReady: ['wait'],
+  ready: ['ready'],
+  done: ['done', 'finished', 'okay'],
+};
+
+
+/* =====================================================================
+   4. SAVING AND LOADING
+   Everything is wrapped in try/catch so a blocked or full localStorage
+   never breaks the app.
+   ===================================================================== */
+
+function loadJSON(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (err) {
+    return fallback;
+  }
+}
+function saveJSON(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch (err) { /* ignore */ }
+}
+function removeSaved(key) {
+  try { localStorage.removeItem(key); } catch (err) { /* ignore */ }
+}
+
+function freshProgress() {
+  return {
+    phase: 'askRecipe',  // 'askRecipe' -> 'cooking' -> 'finished'
+    stepIndex: 0,        // the step he is on now
+    confirmed: [],       // indexes of steps he confirmed
+    lastConfirmed: -1,   // the most recent step he confirmed (for "where was I")
+    timer: null,         // simmer timer: { endsAt, reminderMs, nextReminderAt } (times in ms)
+  };
+}
+
+// Load saved progress, keeping only values that make sense.
+function loadProgress() {
+  const saved = loadJSON(STORAGE_KEYS.progress, null);
+  const p = freshProgress();
+  if (!saved || typeof saved !== 'object') return p;
+  const validIndex = i => Number.isInteger(i) && i >= 0 && i < STEPS.length;
+  if (['askRecipe', 'cooking', 'finished'].includes(saved.phase)) p.phase = saved.phase;
+  if (validIndex(saved.stepIndex)) p.stepIndex = saved.stepIndex;
+  if (Array.isArray(saved.confirmed)) p.confirmed = saved.confirmed.filter(validIndex);
+  if (saved.lastConfirmed === -1 || validIndex(saved.lastConfirmed)) p.lastConfirmed = saved.lastConfirmed;
+  if (saved.timer && typeof saved.timer.endsAt === 'number') p.timer = saved.timer;
+  return p;
+}
+function saveProgress() { saveJSON(STORAGE_KEYS.progress, progress); }
+
+// The burner record is a separate key so it survives even when the recipe is over.
+function loadBurnerOff() {
+  const saved = loadJSON(STORAGE_KEYS.burner, null);
+  if (!saved || !saved.at) return null;
+  const date = new Date(saved.at);
+  return isNaN(date.getTime()) ? null : date;
+}
+function saveBurnerOff() { saveJSON(STORAGE_KEYS.burner, { at: new Date().toISOString() }); }
+function clearBurnerOff() { removeSaved(STORAGE_KEYS.burner); }
+
+
+/* =====================================================================
+   5. APP STATE
+   ===================================================================== */
+
+let progress = loadProgress();   // saved to localStorage
+
+const app = {                     // not saved; only for this page load
+  started: false,   // has Start been pressed?
+  pending: null,    // a yes/no question waiting for an answer:
+                    //   { kind, question, onYes, onNo, value?, extraYes?, extraNo? }
+  backSteps: 0,     // how many "go back"s in a row (so "go back" twice goes two steps back)
+  praiseIndex: 0,
+};
+
+function currentStep() { return STEPS[progress.stepIndex]; }
+function isDemoMode() { return document.getElementById('demoMode').checked; }
+
+
+/* =====================================================================
+   6. TALKING (speechSynthesis)
+   Lines are queued and spoken one at a time. While talking, the
+   microphone is paused so the app never hears itself. When the queue
+   is empty, listening starts again.
+   ===================================================================== */
+
+const tts = {
+  queue: [],
+  speaking: false,
+  token: 0,            // changes on every new line / cancel, so old callbacks are ignored
+  current: null,       // keep a reference: Chrome can drop utterances that get garbage collected
+  voice: null,
+  justCancelled: false,
+};
+
+// Say one or more short lines.
+function say(...lines) {
+  lines = lines.filter(Boolean);
+  if (lines.length === 0) return;
+  addLog('app', lines.join(' '));
+  tts.queue.push(...lines);
+  if (!tts.speaking) speakNext();
+}
+
+function speakNext() {
+  if (!window.speechSynthesis) {      // no voice available: just keep going
+    tts.queue = [];
+    tts.speaking = false;
+    onSpeechFinished();
+    return;
+  }
+  if (tts.queue.length === 0) {
+    tts.speaking = false;
+    onSpeechFinished();
+    return;
+  }
+
+  tts.speaking = true;
+  pauseListening();
+  renderStatus();
+
+  // Chrome sometimes drops a line spoken right after cancel(), so wait a moment.
+  if (tts.justCancelled) {
+    tts.justCancelled = false;
+    setTimeout(speakNext, 120);
+    return;
+  }
+
+  const text = tts.queue.shift();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = SPEECH_RATE;
+  utterance.lang = 'en-US';
+  const voice = pickVoice();
+  if (voice) utterance.voice = voice;
+
+  const myToken = ++tts.token;
+  let finished = false;
+  const finish = () => {
+    if (finished || myToken !== tts.token) return;   // already handled, or cancelled
+    finished = true;
+    clearTimeout(backupTimer);
+    tts.current = null;
+    speakNext();
+  };
+  utterance.onend = finish;
+  utterance.onerror = finish;
+  // Backup in case Chrome never fires onend (a known bug): move on after a generous delay.
+  const backupTimer = setTimeout(finish, 4000 + text.split(/\s+/).length * 700);
+
+  tts.current = utterance;
+  window.speechSynthesis.resume();   // un-stick Chrome if it got paused
+  window.speechSynthesis.speak(utterance);
+}
+
+// Stop talking right away (used for typed commands, jumps, and reset).
+function stopSpeaking() {
+  tts.queue = [];
+  tts.token++;
+  tts.current = null;
+  if (tts.speaking) tts.justCancelled = true;
+  tts.speaking = false;
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+  renderStatus();
+}
+
+function onSpeechFinished() {
+  renderStatus();
+  setTimeout(() => { if (!tts.speaking) startListening(); }, RESUME_LISTEN_DELAY_MS);
+}
+
+// Pick a clear English voice, preferring ones that are known to sound natural.
+function pickVoice() {
+  if (tts.voice) return tts.voice;
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+  const preferred = ['Samantha', 'Google US English', 'Microsoft Aria', 'Microsoft Jenny', 'Microsoft Zira'];
+  for (const name of preferred) {
+    const match = voices.find(v => v.name.includes(name));
+    if (match) return (tts.voice = match);
+  }
+  tts.voice = voices.find(v => v.lang === 'en-US') || voices.find(v => v.lang.startsWith('en')) || null;
+  return tts.voice;
+}
+
+
+/* =====================================================================
+   7. LISTENING (SpeechRecognition)
+   - continuous + interim results, so we hear the whole sentence
+   - every new word resets a 2.5 s silence timer; only when it runs out
+     do we act on everything heard ("I want to make... turkey chili")
+   - recognition restarts whenever it ends, and nothing ever times out
+   - recognition is stopped while the app is talking
+   ===================================================================== */
+
+const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+const mic = {
+  rec: null,
+  running: false,      // recognition is on
+  starting: false,     // start() was called, waiting for onstart
+  blocked: false,      // permission denied or no microphone
+  blockedSpoken: false,
+  finalText: '',       // finished words in the current sentence
+  interimText: '',     // words still being recognized
+  altTexts: [],        // other possible readings (used only for guessing)
+  silenceTimer: null,
+  discard: false,      // ignore results until recognition restarts (after we acted)
+  retryDelay: 250,
+};
+
+function setupRecognition() {
+  if (!SpeechRec || mic.rec) return;
+  const rec = new SpeechRec();
+  rec.lang = 'en-US';
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.maxAlternatives = 3;
+
+  rec.onstart = () => {
+    mic.running = true;
+    mic.starting = false;
+    mic.discard = false;
+    mic.retryDelay = 250;
+    renderStatus();
+  };
+  rec.onresult = onRecognitionResult;
+  rec.onerror = onRecognitionError;
+  rec.onend = () => {
+    mic.running = false;
+    mic.starting = false;
+    // Words that never became "final" would be lost, so keep them for this sentence.
+    if (mic.interimText && !mic.discard) mic.finalText += mic.interimText + ' ';
+    mic.interimText = '';
+    renderStatus();
+    if (shouldListen()) setTimeout(startListening, mic.retryDelay);
+  };
+  mic.rec = rec;
+}
+
+function shouldListen() {
+  return app.started && !!mic.rec && !mic.blocked && !tts.speaking;
+}
+
+function startListening() {
+  if (!shouldListen() || mic.running) return;
+  mic.starting = true;
+  try {
+    mic.rec.start();
+  } catch (err) {
+    // Already started: that's fine, onend will restart it later if needed.
+  }
+}
+
+function pauseListening() {
+  if (mic.rec && (mic.running || mic.starting)) {
+    try { mic.rec.abort(); } catch (err) { /* ignore */ }
+  }
+}
+
+function onRecognitionResult(event) {
+  if (mic.discard || tts.speaking) return;
+  let interim = '';
+  for (let i = event.resultIndex; i < event.results.length; i++) {
+    const result = event.results[i];
+    if (result.isFinal) {
+      mic.finalText += result[0].transcript + ' ';
+      for (let a = 1; a < result.length; a++) mic.altTexts.push(result[a].transcript);
+    } else {
+      interim += result[0].transcript;
+    }
+  }
+  mic.interimText = interim;
+  showCaption((mic.finalText + interim).trim(), true);
+
+  // He is still talking: wait for 2.5 s of quiet after this.
+  clearTimeout(mic.silenceTimer);
+  mic.silenceTimer = setTimeout(onSilence, SILENCE_MS);
+}
+
+// 2.5 s of quiet: act on the whole sentence.
+function onSilence() {
+  mic.silenceTimer = null;
+  if (tts.speaking) {                 // the app is talking (e.g. a stir reminder): wait for it
+    mic.silenceTimer = setTimeout(onSilence, 500);
+    return;
+  }
+  const text = (mic.finalText + mic.interimText).trim();
+  const alts = mic.altTexts;
+  clearHeard();
+  if (!text) return;
+
+  // Restart recognition fresh so these words can't be heard twice.
+  mic.discard = true;
+  pauseListening();
+  handleUtterance(text, alts);
+}
+
+function clearHeard() {
+  clearTimeout(mic.silenceTimer);
+  mic.silenceTimer = null;
+  mic.finalText = '';
+  mic.interimText = '';
+  mic.altTexts = [];
+}
+
+function onRecognitionError(event) {
+  switch (event.error) {
+    case 'not-allowed':
+    case 'service-not-allowed':
+      mic.blocked = true;
+      showMicBlocked();
+      break;
+    case 'audio-capture':           // no microphone found; keep trying slowly in case one is plugged in
+      mic.retryDelay = 3000;
+      showAlert('I could not find a microphone. Please plug one in. You can type commands below.');
+      break;
+    case 'network':                 // Chrome's speech service is unreachable; retry slowly
+      mic.retryDelay = 3000;
+      break;
+    default:                        // 'no-speech', 'aborted', etc.: restart quietly
+      mic.retryDelay = 250;
+  }
+}
+
+// Ask for the microphone once up front, so the permission prompt shows right after Start.
+async function checkMicPermission() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return true; // recognition will ask
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream.getTracks().forEach(track => track.stop());
+    return true;
+  } catch (err) {
+    if (err.name === 'NotAllowedError' || err.name === 'SecurityError') return false;
+    if (err.name === 'NotFoundError') {
+      showAlert('I could not find a microphone. Please plug one in. You can type commands below.');
+    }
+    return true; // other errors: let recognition try and report
+  }
+}
+
+// Safety net: if recognition stopped for any reason, start it again.
+setInterval(() => { if (shouldListen() && !mic.running) startListening(); }, 3000);
+
+
+/* =====================================================================
+   8. UNDERSTANDING WHAT WAS SAID
+   ===================================================================== */
+
+// "What's NEXT?!" -> "whats next"
+function normalize(text) {
+  return String(text).toLowerCase()
+    .replace(/[’‘']/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// True if any phrase appears as whole words in the (normalized) text.
+function hasPhrase(t, phrases) {
+  const padded = ` ${t} `;
+  return phrases.some(p => padded.includes(` ${normalize(p)} `));
+}
+
+function hasNegation(t) { return hasPhrase(t, NEGATIONS); }
+
+// The first clear command in the text, or null.
+function detectCommand(t) {
+  const negated = hasNegation(t);
+  for (const name of COMMAND_ORDER) {
+    if ((name === 'ready' || name === 'done') && negated) continue;
+    if (hasPhrase(t, PHRASES[name])) return name;
+  }
+  return null;
+}
+
+// 'yes', 'no', or null. A "no" word always wins, so we never move ahead on a mixed answer.
+function yesOrNo(t, extraYes = [], extraNo = []) {
+  if (hasPhrase(t, NO_WORDS) || hasPhrase(t, extraNo)) return 'no';
+  if (hasPhrase(t, YES_WORDS) || hasPhrase(t, extraYes)) return 'yes';
+  return null;
+}
+
+// Questions about the stove, like "did I turn off the stove" or "is the burner off".
+// Statements like "I turned the burner off" are NOT questions.
+const STOVE = '(stove|stoves|stovetop|burner|burners|oven|knob|cooktop)';
+const STOVE_QUESTIONS = [
+  new RegExp(`\\b(did i|did you|did we|have i|had i|was the|was my|is the|is my|are the)\\b.*\\b${STOVE}\\b`),
+  new RegExp(`\\b${STOVE}\\b.*\\b(did i|have i)\\b`),
+  new RegExp(`\\bis ${STOVE}\\b`),
+  new RegExp(`\\b(forgot|forget|not sure|dont remember|cant remember|remember|wondering)\\b.*\\b${STOVE}\\b`),
+  /\bdid i turn (it|that|everything) off\b/,
+  /\bdid i turn off (it|that|everything)\b/,
+  /\b(is it|is that|was it) (off|on)\b/,
+];
+function isStoveQuestion(t) { return STOVE_QUESTIONS.some(re => re.test(t)); }
+
+/* ----- Temperatures: "165", "one sixty-five", "one hundred sixty five", "one six five" ----- */
+const UNITS = { zero: 0, oh: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9 };
+const TEENS = { ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15,
+                sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19 };
+const TENS = { twenty: 20, thirty: 30, forty: 40, fourty: 40, fifty: 50, sixty: 60,
+               seventy: 70, eighty: 80, ninety: 90 };
+
+function isNumberWord(w) {
+  return /^\d+$/.test(w) || w in UNITS || w in TEENS || w in TENS || w === 'hundred';
+}
+function numberWordValue(w) {
+  if (/^\d+$/.test(w)) return parseInt(w, 10);
+  if (w in UNITS) return UNITS[w];
+  if (w in TEENS) return TEENS[w];
+  if (w in TENS) return TENS[w];
+  return 0;
+}
+
+// Turn one group of number words into a number.
+function numberFromWords(words) {
+  if (words.includes('hundred')) {
+    // Standard form: "one hundred sixty five" = 1*100 + 60 + 5
+    let total = 0, current = 0;
+    for (const w of words) {
+      if (w === 'hundred') { total += (current || 1) * 100; current = 0; }
+      else current += numberWordValue(w);
+    }
+    return total + current;
+  }
+  // Spoken-digits form: "one sixty five" -> "1" + "65" = 165, "one six five" -> 165
+  let digits = '';
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    const next = words[i + 1];
+    if (w in TENS && next in UNITS && UNITS[next] > 0) { digits += String(TENS[w] + UNITS[next]); i++; }
+    else digits += String(numberWordValue(w));
+  }
+  return digits ? parseInt(digits, 10) : null;
+}
+
+// Find a temperature in what he said. Returns a number or null.
+// If he says more than one ("165, no, 155"), the LAST one counts.
+function parseTemperature(rawText) {
+  const text = String(rawText).toLowerCase()
+    .replace(/(\d+)\.\d+/g, '$1')        // 164.8 -> 164 (round down, to stay on the safe side)
+    .replace(/[^a-z0-9\s]/g, ' ');        // "sixty-five" -> "sixty five", "1:65" -> "1 65"
+  const words = text.split(/\s+/).filter(Boolean);
+
+  // Split into groups of number words. "and" / "a" are allowed around "hundred".
+  const groups = [];
+  let group = [];
+  words.forEach((w, i) => {
+    const prev = words[i - 1];
+    const next = words[i + 1];
+    if (w === 'oh' && group.length === 0) w = '';           // "oh, it's 165": "oh" is not zero here
+    else if (w === 'a' && next === 'hundred') w = 'one';    // "a hundred seventy"
+    else if (w === 'and' && prev === 'hundred' && next && isNumberWord(next)) return; // skip "and"
+    if (w && isNumberWord(w)) group.push(w);
+    else if (group.length) { groups.push(group); group = []; }
+  });
+  if (group.length) groups.push(group);
+
+  const values = groups.map(numberFromWords)
+    .filter(n => n !== null && n >= PLAUSIBLE_TEMP.min && n <= PLAUSIBLE_TEMP.max);
+  return values.length ? values[values.length - 1] : null;
+}
+
+/* ----- Guessing (only used to ASK, never to act) ----- */
+function editDistance(a, b) {
+  const row = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let prevDiag = row[0];
+    row[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const temp = row[j];
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prevDiag + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prevDiag = temp;
+    }
+  }
+  return row[b.length];
+}
+
+// Our best guess at what he meant, or null if we have no good guess.
+function guessIntent(t, alts) {
+  // 1. Another possible reading from the recognizer might be a clear command.
+  for (const alt of alts) {
+    const command = detectCommand(normalize(alt));
+    if (command && GUESS_ORDER.includes(command)) return command;
+  }
+  // 2. Known near-misses ("peat" for "repeat", "dun" for "done").
+  for (const intent of GUESS_ORDER) {
+    if (hasPhrase(t, GUESS_PHRASES[intent])) return intent;
+  }
+  // 3. Short sentences only: a word that is spelled almost like a command word.
+  const words = t.split(' ');
+  if (words.length <= 5) {
+    for (const intent of GUESS_ORDER) {
+      for (const key of FUZZY_KEYS[intent] || []) {
+        const maxDistance = key.length <= 4 ? 1 : 2;
+        const close = words.some(w => w.length >= 3 && Math.abs(w.length - key.length) <= 2 &&
+                                      editDistance(w, key) <= maxDistance);
+        if (close) return intent;
+      }
+    }
+  }
+  return null;
+}
+
+
+/* =====================================================================
+   9. THE CONVERSATION
+   handleUtterance() is called with every full sentence he says (or types).
+   Order of checks:
+     1. Stove question (works any time)
+     2. Hurt / fire safety
+     3. An open yes/no question
+     4. Whatever fits the current phase and step
+   ===================================================================== */
+
+function handleUtterance(rawText, alts = []) {
+  const t = normalize(rawText);
+  if (!t) return;
+  addLog('user', rawText);
+  showCaption(rawText, false);
+
+  const command = detectCommand(t);
+  const backStepsBefore = app.backSteps;
+  app.backSteps = 0;   // "go back" sets this again if it's the command
+
+  if (isStoveQuestion(t)) {
+    answerStoveQuestion();
+    reaskOpenQuestion();
+  } else if (command === 'hurt') {
+    app.pending = null;
+    say('If you are hurt, stop and ask someone for help.',
+        'For a small burn, hold it under cool running water.',
+        "Tell me when you're ready to keep going.");
+  } else if (command === 'fire') {
+    app.pending = null;
+    say('If there is a fire, get away from the stove and call 9 1 1.',
+        'If you only see a little smoke, turn the burner to OFF.');
+  } else if (app.pending && handlePendingAnswer(t, command, rawText)) {
+    // answered the open question
+  } else if (progress.phase === 'askRecipe') {
+    handleRecipeChoice(t, command);
+  } else if (progress.phase === 'cooking') {
+    handleCooking(t, command, rawText, alts, backStepsBefore);
+  } else {
+    handleFinished(command);
+  }
+  render();
+}
+
+/* ----- Yes/no questions ----- */
+
+function askYesNo(question) {
+  app.pending = question;
+  say(question.question);
+  render();
+}
+
+// Returns true if the answer was handled here.
+function handlePendingAnswer(t, command, rawText) {
+  const p = app.pending;
+
+  // While confirming a temperature, a different number is a new reading.
+  if (p.kind === 'temp') {
+    const n = parseTemperature(rawText);
+    if (n !== null && n !== p.value) { askTemperatureConfirm(n); return true; }
+  }
+
+  const answer = yesOrNo(t, p.extraYes, p.extraNo);
+  if (answer === 'yes') { app.pending = null; p.onYes(); return true; }
+  if (answer === 'no') { app.pending = null; p.onNo(); return true; }
+
+  if (command === 'repeat') { say(p.question); return true; }
+  if (command) { app.pending = null; return false; }   // a different clear command: handle it normally
+
+  say('Sorry, please say yes or no.', p.question);
+  return true;
+}
+
+// After answering a side question (like the stove), ask the open question again.
+function reaskOpenQuestion() {
+  if (app.pending) say(app.pending.question);
+  else if (progress.phase === 'cooking' && currentStep().type === 'burnerCheck') say(currentStep().text);
+}
+
+/* ----- Stove question ----- */
+
+function answerStoveQuestion() {
+  const savedAt = loadBurnerOff();
+  if (savedAt && isToday(savedAt)) {
+    say(`You confirmed the burner was off today at ${formatTime(savedAt)}.`, "I can't check the stove myself.");
+  } else if (savedAt) {
+    // An old confirmation from another day says nothing about today.
+    say("You haven't told me the burner is off today.",
+        `The last time was ${formatDay(savedAt)} at ${formatTime(savedAt)}.`,
+        "I can't check the stove myself.");
+  } else {
+    say("You haven't told me the burner is off yet.", "I can't check the stove myself.");
+  }
+}
+
+/* ----- Phase 1: choosing the recipe ----- */
+
+function handleRecipeChoice(t, command) {
+  if (command === 'notReady') { say("Okay, I'll wait."); return; }
+  if (command === 'repeat' || command === 'whereWasI') { say('What would you like to cook?'); return; }
+  if (command === 'simpler') { say('Tell me the food you want to make. I know how to make turkey chili.'); return; }
+
+  // He said "chili": check before starting. Anything else: offer the one recipe we know.
+  const question = hasPhrase(t, RECIPE_WORDS)
+    ? 'Turkey chili, is that right?'
+    : 'Right now I know how to make turkey chili. Do you want to make turkey chili?';
+  askYesNo({
+    kind: 'recipe',
+    question,
+    onYes: beginRecipe,
+    onNo: () => say('Okay. What would you like to cook?'),
+  });
+}
+
+function beginRecipe() {
+  progress = freshProgress();
+  progress.phase = 'cooking';
+  say(...RECIPE_INTRO);
+  enterStep(0);
+}
+
+/* ----- Phase 2: cooking ----- */
+
+function handleCooking(t, command, rawText, alts, backStepsBefore) {
+  const step = currentStep();
+
+  // Temperature steps: a number is the answer.
+  if (step.type === 'temp') {
+    const n = parseTemperature(rawText);
+    if (n !== null) { askTemperatureConfirm(n); return; }
+  }
+
+  // Burner safety check: a yes/no step.
+  if (step.type === 'burnerCheck') {
+    const answer = yesOrNo(t, BURNER_YES, BURNER_NO);
+    if (answer === 'yes') { confirmStep(); return; }
+    if (answer === 'no') { say('Okay. Turn the knob to OFF now.', 'Is it at OFF?'); return; }
+  }
+
+  // Commands that work on every step. None of these move forward.
+  switch (command) {
+    case 'whereWasI': say(...whereWasILines()); return;
+    case 'goBack': goBack(backStepsBefore); return;
+    case 'whatsNext': previewNext(); return;
+    case 'notReady': say("Okay, I'll wait."); return;
+    case 'problem': say("That's okay. Take your time.", 'You can ask someone to help you.', howToFinish(step)); return;
+    case 'simpler': say(step.simpler); return;
+    case 'repeat': repeatStep(); return;
+  }
+
+  // Finishing the step.
+  if (tryFinishStep(t, command, step)) return;
+
+  // Not clear: ask about our best guess, or say we didn't catch it.
+  const guess = guessIntent(t, alts);
+  if (guess) askAboutGuess(guess, step);
+  else sayNotCaught(step);
+}
+
+// Handle "done", "ready", and step words. Returns true if handled.
+function tryFinishStep(t, command, step) {
+  const stepWords = !!step.doneWords && hasPhrase(t, step.doneWords) && !hasNegation(t);
+  const doneOrReady = command === 'done' || command === 'ready';
+
+  switch (step.type) {
+    case 'done':
+    case 'wait':
+      if (doneOrReady || stepWords) { confirmStep(); return true; }
+      return false;
+
+    case 'ready':
+      if (command === 'ready' || stepWords) { confirmStep(); return true; }
+      if (command === 'done') { askFinishQuestion(step); return true; }  // we want "ready" here, so check
+      return false;
+
+    case 'temp':
+      if (doneOrReady) { say(step.text); return true; }   // ready to check again: ask for the number
+      return false;
+
+    case 'timer':
+      if (doneOrReady) { say('The chili is still cooking.', timeLeftPhrase(), "I'll tell you when the time is up."); return true; }
+      return false;
+
+    case 'burnerCheck':
+      if (doneOrReady) { say('Please look at the knob.', 'Is it at OFF? Please say yes or no.'); return true; }
+      return false;
+  }
+  return false;
+}
+
+// The question we ask when we think he might be finished.
+function finishQuestionText(step) {
+  if (step.type === 'ready') return 'Are you ready to check the temperature?';
+  if (step.type === 'wait') return 'Are you ready to put the leftovers away?';
+  return `Did you finish the ${step.short} step?`;
+}
+function askFinishQuestion(step) {
+  askYesNo({
+    kind: 'finish',
+    question: finishQuestionText(step),
+    onYes: () => confirmStep(),
+    onNo: () => say("Okay, I'll wait."),
+  });
+}
+
+// We have a guess about what he meant: ask first, act only on "yes".
+function askAboutGuess(intent, step) {
+  // On steps that don't use done/ready, a done-like guess just gets the step's own reminder.
+  if (intent === 'done' || intent === 'ready') {
+    if (step.type === 'temp') { say(step.text); return; }
+    if (step.type === 'timer') { say('The chili is still cooking.', timeLeftPhrase()); return; }
+    if (step.type === 'burnerCheck') { say('Please say yes or no.', 'Is the knob at OFF?'); return; }
+    askFinishQuestion(step);
+    return;
+  }
+  const questions = {
+    repeat: [`Did you want me to repeat the ${step.short} step?`, repeatStep],
+    simpler: ['Do you want me to say it a simpler way?', () => say(step.simpler)],
+    goBack: ['Do you want to hear the last step?', () => goBack(0)],
+    whereWasI: ['Do you want me to tell you where you are?', () => say(...whereWasILines())],
+    whatsNext: ["Do you want to hear what's next?", previewNext],
+    notReady: ['Do you need more time?', () => say("Okay, I'll wait.")],
+  };
+  const [question, onYes] = questions[intent];
+  askYesNo({
+    kind: 'guess',
+    question,
+    onYes,
+    onNo: () => say('Okay. You can say done, repeat, or where was I.'),
+  });
+}
+
+function sayNotCaught(step) {
+  if (step.type === 'temp') say("Sorry, I didn't catch that.", 'Tell me the number on your thermometer, or say repeat.');
+  else if (step.type === 'burnerCheck') say("Sorry, I didn't catch that.", 'Is the knob at OFF? Please say yes or no.');
+  else say(NOT_CAUGHT);
+}
+
+// What to say to finish this kind of step.
+function howToFinish(step) {
+  switch (step.type) {
+    case 'ready': return "Say ready when you're ready to check the temperature.";
+    case 'temp': return 'Tell me the number on your thermometer.';
+    case 'timer': return "I'll tell you when the time is up.";
+    case 'burnerCheck': return 'Is the knob at OFF?';
+    case 'wait': return "Say I'm back when you're ready.";
+    default: return 'Say done when you finish.';
+  }
+}
+
+/* ----- Commands that don't move forward ----- */
+
+// What we say for the current step (for repeat and reminders).
+function currentStepLines() {
+  const step = currentStep();
+  if (step.type === 'timer') {
+    if (!progress.timer) return [step.text];
+    return ['The chili is cooking gently.', timeLeftPhrase(), "I'll remind you to stir."];
+  }
+  return [step.text];
+}
+
+function repeatStep() { say(...currentStepLines()); }
+
+// "You told me you [last confirmed step]. Next is [current step]."
+function whereWasILines() {
+  const lines = [];
+  if (progress.lastConfirmed >= 0) lines.push(`You told me you ${STEPS[progress.lastConfirmed].past}.`);
+  else lines.push("We're just getting started.");
+  const step = currentStep();
+  if (step.type === 'timer' && progress.timer) lines.push('Now the chili is simmering.', timeLeftPhrase());
+  else lines.push(`Next is: ${step.text}`);
+  return lines;
+}
+
+// Read the step before (without undoing it), then remind him of the current step.
+function goBack(backStepsBefore) {
+  const steps = backStepsBefore + 1;          // "go back" again goes one more step back
+  const index = progress.stepIndex - steps;
+  if (index < 0) {
+    // Nothing earlier to read.
+    say(steps === 1 ? 'This is the first step.' : 'That was the first step.', `Now: ${currentStepLines().join(' ')}`);
+    return;
+  }
+  app.backSteps = steps;
+  const earlier = STEPS[index];
+  say(
+    `${steps === 1 ? 'The last step was' : 'Before that'}: ${earlier.plain || earlier.text}`,
+    progress.confirmed.includes(index) ? 'You already finished that one.' : '',
+    `Now: ${currentStepLines().join(' ')}`
+  );
+}
+
+// Tell him the next step without moving forward.
+function previewNext() {
+  const next = STEPS[progress.stepIndex + 1];
+  if (!next) say('This is the last step.', "Tell me when you're ready.");
+  else say(`After this: ${next.plain || next.text}`, "Tell me when you're ready.");
+}
+
+/* ----- Temperature ----- */
+
+// Always repeat the number back first: a wrong number could mean unsafe turkey.
+function askTemperatureConfirm(n) {
+  askYesNo({
+    kind: 'temp',
+    value: n,
+    question: `I heard ${n} degrees. Is that right?`,
+    onYes: () => checkTemperature(n),
+    onNo: () => say('Okay. Tell me the number on your thermometer.'),
+  });
+}
+
+function checkTemperature(n) {
+  if (n >= SAFE_TEMP_F) {
+    const message = currentStep().key === 'temp1'
+      ? `${n} degrees. That piece is hot enough.`
+      : `${n} degrees. The turkey is cooked.`;
+    confirmStep({ message });
+  } else {
+    say(`${n} degrees is not hot enough yet.`, "Keep cooking and stirring. Tell me when you're ready to check again.");
+  }
+}
+
+/* ----- Phase 3: finished ----- */
+
+function handleFinished(command) {
+  if (command === 'repeat') say(ALL_DONE);
+  else if (command === 'whereWasI') say('You finished the turkey chili.', `You told me you ${STEPS[STEPS.length - 1].past}.`);
+  else if (command === 'done' || command === 'ready') say('You finished everything. Great job!');
+  else if (command === 'notReady') say("Okay, I'll wait.");
+  else say("Sorry, I didn't catch that.", 'You can ask me: did I turn off the stove?');
+}
+
+
+/* =====================================================================
+   10. MOVING THROUGH STEPS, THE TIMER, THE BURNER RECORD
+   ===================================================================== */
+
+// Go to a step and say it. Saves progress.
+function enterStep(index, { before = [] } = {}) {
+  stopTimerTicking();
+  app.pending = null;            // an old question is about the old step
+  progress.stepIndex = index;
+  progress.timer = null;
+  const step = STEPS[index];
+  say(...before, step.intro, step.text);
+  if (step.type === 'timer') startTimer();
+  saveProgress();
+  render();
+}
+
+// He confirmed the current step: remember it, then go to the next one.
+function confirmStep({ message = null, praise = true } = {}) {
+  const index = progress.stepIndex;
+  const step = STEPS[index];
+  if (!progress.confirmed.includes(index)) progress.confirmed.push(index);
+  progress.lastConfirmed = index;
+
+  // Burner record:
+  // - When he turns the burner ON, an older "burner is off" record is no longer true, so remove it.
+  // - When he confirms it is OFF, save the date and time.
+  if (step.effect === 'burnerOn') clearBurnerOff();
+  if (step.effect === 'burnerOff') saveBurnerOff();
+
+  const before = [];
+  if (message) before.push(message);
+  else if (step.confirmMessage) before.push(step.confirmMessage);
+  else if (praise && index + 1 < STEPS.length) before.push(nextPraise());
+
+  if (index + 1 < STEPS.length) {
+    enterStep(index + 1, { before });   // enterStep saves progress
+  } else {
+    progress.phase = 'finished';
+    progress.timer = null;
+    saveProgress();
+    say(...before, ALL_DONE);
+    render();
+  }
+}
+
+function nextPraise() {
+  const word = PRAISE[app.praiseIndex % PRAISE.length];
+  app.praiseIndex++;
+  return word;
+}
+
+/* ----- Simmer timer ----- */
+
+let timerInterval = null;
+
+function startTimer() {
+  const config = isDemoMode() ? TIMER_DEMO : TIMER_REAL;
+  const now = Date.now();
+  progress.timer = { endsAt: now + config.totalMs, reminderMs: config.reminderMs, nextReminderAt: now + config.reminderMs };
+  saveProgress();
+  runTimer();
+}
+
+function runTimer() {
+  stopTimerTicking();
+  timerInterval = setInterval(timerTick, 250);
+  timerTick();
+}
+
+function stopTimerTicking() {
+  clearInterval(timerInterval);
+  timerInterval = null;
+}
+
+function timerTick() {
+  const timer = progress.timer;
+  if (!timer || progress.phase !== 'cooking' || currentStep().type !== 'timer') { stopTimerTicking(); return; }
+  const now = Date.now();
+  if (now >= timer.endsAt) {
+    stopTimerTicking();
+    finishTimer();
+    return;
+  }
+  if (now >= timer.nextReminderAt) {
+    timer.nextReminderAt += timer.reminderMs;
+    saveProgress();
+    if (timer.endsAt - now > 1000) say('Time to stir.');
+  }
+  renderTimer();
+}
+
+// The simmer step ends by time, not by him saying done.
+function finishTimer() {
+  progress.timer = null;
+  confirmStep({ praise: false });   // next step says "The 10 minutes are up..."
+}
+
+function timeLeftPhrase() {
+  const ms = progress.timer ? Math.max(0, progress.timer.endsAt - Date.now()) : 0;
+  const seconds = Math.ceil(ms / 1000);
+  if (seconds >= 90) return `About ${Math.round(seconds / 60)} minutes are left.`;
+  if (seconds >= 60) return 'About 1 minute is left.';
+  return seconds === 1 ? 'About 1 second is left.' : `About ${seconds} seconds are left.`;
+}
+
+/* ----- Dates and times for the stove answer ----- */
+
+function isToday(date) { return date.toDateString() === new Date().toDateString(); }
+function formatTime(date) { return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+function formatDay(date) { return date.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }); }
+
+
+/* =====================================================================
+   11. THE SCREEN (secondary: nothing here is needed to cook)
+   ===================================================================== */
+
+const el = {
+  status: document.getElementById('status'),
+  alert: document.getElementById('alert'),
+  startBtn: document.getElementById('startBtn'),
+  counter: document.getElementById('stepCounter'),
+  instruction: document.getElementById('instruction'),
+  question: document.getElementById('question'),
+  timer: document.getElementById('timer'),
+  caption: document.getElementById('caption'),
+  demo: document.getElementById('demoMode'),
+  jump: document.getElementById('jumpSelect'),
+  reset: document.getElementById('resetBtn'),
+  typeForm: document.getElementById('typeForm'),
+  typeInput: document.getElementById('typeInput'),
+  log: document.getElementById('log'),
+};
+
+function render() {
+  const total = STEPS.length;
+  if (progress.phase === 'askRecipe') {
+    el.counter.textContent = app.started ? 'Getting started' : 'Press Start to begin';
+    el.instruction.textContent = 'What would you like to cook?';
+  } else if (progress.phase === 'cooking') {
+    el.counter.textContent = `Step ${progress.stepIndex + 1} of ${total}` + (app.started ? '' : ' (press Start to keep going)');
+    el.instruction.textContent = currentStep().text;
+  } else {
+    el.counter.textContent = 'Finished';
+    el.instruction.textContent = ALL_DONE;
+  }
+  el.question.hidden = !app.pending;
+  el.question.textContent = app.pending ? app.pending.question : '';
+  el.jump.value = progress.phase === 'cooking' ? String(progress.stepIndex) : '';
+  renderTimer();
+  renderStatus();
+}
+
+function renderTimer() {
+  const timer = progress.timer;
+  const show = progress.phase === 'cooking' && currentStep().type === 'timer' && !!timer;
+  el.timer.hidden = !show;
+  if (!show) return;
+  const seconds = Math.max(0, Math.ceil((timer.endsAt - Date.now()) / 1000));
+  const mm = Math.floor(seconds / 60);
+  const ss = String(seconds % 60).padStart(2, '0');
+  el.timer.textContent = `Timer: ${mm}:${ss} left`;
+}
+
+function renderStatus() {
+  let text = 'Press Start';
+  let cls = '';
+  if (app.started) {
+    if (tts.speaking) { text = 'Talking…'; cls = 'speaking'; }
+    else if (!SpeechRec) text = 'Typing only';
+    else if (mic.blocked) text = 'Microphone blocked';
+    else if (mic.running) { text = 'Listening…'; cls = 'listening'; }
+    else text = 'Starting microphone…';
+  }
+  el.status.textContent = text;
+  el.status.className = 'status ' + cls;
+}
+
+function showCaption(text, live) {
+  el.caption.textContent = text || 'nothing yet';
+  el.caption.className = live ? 'live' : '';
+}
+
+function addLog(who, text) {
+  const li = document.createElement('li');
+  li.className = who;
+  const label = document.createElement('span');
+  label.className = 'who';
+  label.textContent = who === 'app' ? 'App:' : 'You:';
+  li.append(label, document.createTextNode(text));
+  el.log.append(li);
+  while (el.log.children.length > 300) el.log.firstChild.remove();
+  el.log.scrollTop = el.log.scrollHeight;
+}
+
+// kind: 'browser' (wrong browser) or 'mic' (microphone problem). Only mic alerts get cleared.
+function showAlert(message, kind = 'mic') {
+  el.alert.textContent = message;
+  el.alert.dataset.kind = kind;
+  el.alert.hidden = false;
+}
+function hideMicAlert() {
+  if (el.alert.dataset.kind === 'mic') el.alert.hidden = true;
+}
+
+function showMicBlocked() {
+  showAlert('The microphone is blocked, so I cannot hear you. Click the microphone or lock icon in the ' +
+            'address bar, choose Allow, then click "Try the microphone again". You can type commands below.', 'mic');
+  el.startBtn.textContent = 'Try the microphone again';
+  el.startBtn.hidden = false;
+  renderStatus();
+  if (!mic.blockedSpoken) {
+    mic.blockedSpoken = true;
+    say("I can't hear you because the microphone is off. Please ask someone to help turn it on.");
+  }
+}
+
+function populateJumpList() {
+  const first = new Option('Choose a step…', '');
+  el.jump.append(first);
+  STEPS.forEach((step, i) => {
+    const label = `${i + 1}. ${step.plain || step.text}`;
+    el.jump.append(new Option(label.length > 70 ? label.slice(0, 67) + '…' : label, String(i)));
+  });
+}
+
+
+/* =====================================================================
+   12. BUTTONS AND CONTROLS
+   ===================================================================== */
+
+// Start (first press) or "Try the microphone again" (after the mic was blocked).
+async function onStartPressed() {
+  const firstStart = !app.started;
+  app.started = true;
+  el.startBtn.hidden = true;
+  requestWakeLock();
+
+  if (SpeechRec) {
+    setupRecognition();
+    const allowed = await checkMicPermission();
+    mic.blocked = !allowed;
+    if (allowed) hideMicAlert();
+    else showMicBlocked();
+  }
+
+  if (firstStart) greet();
+  else if (!tts.speaking) startListening();
+  render();
+}
+
+// What we say when Start is pressed, based on saved progress.
+function greet() {
+  if (progress.phase === 'cooking') {
+    const step = currentStep();
+    if (step.type === 'timer') {
+      if (!progress.timer) { enterStep(progress.stepIndex); return; }          // timer never started
+      if (Date.now() >= progress.timer.endsAt) { say('Welcome back.'); finishTimer(); return; }
+      // Skip any reminders we missed while the page was closed.
+      while (progress.timer.nextReminderAt <= Date.now()) progress.timer.nextReminderAt += progress.timer.reminderMs;
+      say('Welcome back.', ...whereWasILines());
+      runTimer();
+      return;
+    }
+    say('Welcome back.', ...whereWasILines());
+  } else if (progress.phase === 'finished') {
+    say('You already finished the turkey chili. Great job!', 'You can ask me if you turned off the stove.');
+  } else {
+    say('What would you like to cook?');
+  }
+}
+
+// A typed command is handled exactly like a spoken one.
+function onTypedCommand(event) {
+  event.preventDefault();
+  const text = el.typeInput.value.trim();
+  if (!text) return;
+  if (!app.started) {
+    showCaption('Press Start first.', false);
+    return;
+  }
+  el.typeInput.value = '';
+  stopSpeaking();
+  clearHeard();
+  mic.discard = true;
+  pauseListening();
+  handleUtterance(text, []);
+  if (!tts.speaking) startListening();
+}
+
+// Demo: go straight to a step. Earlier steps count as confirmed.
+function onJump() {
+  if (el.jump.value === '') return;
+  const index = parseInt(el.jump.value, 10);
+  stopSpeaking();
+  stopTimerTicking();
+  clearHeard();
+  progress = freshProgress();
+  progress.phase = 'cooking';
+  progress.confirmed = Array.from({ length: index }, (_, i) => i);
+  progress.lastConfirmed = index - 1;
+  // If we skip past "burner to medium" but not past the burner check, the burner is on now.
+  if (index > STEP_INDEX.burnerMedium && index <= STEP_INDEX.burnerCheck) clearBurnerOff();
+  if (app.started) {
+    enterStep(index);
+  } else {
+    progress.stepIndex = index;
+    saveProgress();
+    render();
+  }
+}
+
+// Demo: forget everything (progress AND the burner record) and start over.
+function onReset() {
+  stopSpeaking();
+  stopTimerTicking();
+  clearHeard();
+  app.pending = null;
+  app.backSteps = 0;
+  progress = freshProgress();
+  removeSaved(STORAGE_KEYS.progress);
+  clearBurnerOff();
+  el.log.replaceChildren();
+  showCaption('', false);
+  render();
+  if (app.started) say('What would you like to cook?');
+}
+
+function onDemoToggle() {
+  saveJSON(STORAGE_KEYS.demo, el.demo.checked);
+  // If the simmer timer is running, restart it with the new length.
+  if (progress.phase === 'cooking' && currentStep().type === 'timer' && progress.timer && app.started) startTimer();
+  render();
+}
+
+// Keep the screen (and so the microphone) awake while cooking.
+let wakeLock = null;
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
+  } catch (err) { /* not allowed right now; that's okay */ }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && app.started) requestWakeLock();
+});
+
+
+/* =====================================================================
+   13. START-UP
+   ===================================================================== */
+
+function init() {
+  populateJumpList();
+  el.demo.checked = loadJSON(STORAGE_KEYS.demo, false) === true;
+
+  el.startBtn.addEventListener('click', onStartPressed);
+  el.typeForm.addEventListener('submit', onTypedCommand);
+  el.jump.addEventListener('change', onJump);
+  el.reset.addEventListener('click', onReset);
+  el.demo.addEventListener('change', onDemoToggle);
+
+  if (!SpeechRec) {
+    showAlert('This browser cannot listen to speech. Please open this page in Google Chrome on a computer. ' +
+              'You can still press Start and type commands below.', 'browser');
+  } else if (!window.speechSynthesis) {
+    showAlert('This browser cannot talk. Please use Google Chrome on a computer.', 'browser');
+  }
+  if (window.speechSynthesis) {
+    window.speechSynthesis.onvoiceschanged = () => { tts.voice = null; };
+  }
+  render();
+}
+
+init();
+</script>
+</body>
+</html>
