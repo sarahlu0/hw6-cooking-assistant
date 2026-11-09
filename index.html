@@ -137,6 +137,7 @@
   .controls select { max-width: 100%; }
   .controls input[type="text"] { flex: 1 1 220px; min-width: 0; }
   .controls button { cursor: pointer; font-weight: 700; }
+  .controls .small-btn { font-size: 0.85rem; padding: 4px 10px; font-weight: 600; }
   .controls input[type="checkbox"] { width: 1.3rem; height: 1.3rem; vertical-align: middle; }
 
   .log-box { margin-top: 20px; }
@@ -186,6 +187,7 @@
       <label for="jumpSelect">Jump to step</label>
       <select id="jumpSelect"></select>
       <button id="resetBtn" type="button">Reset</button>
+      <button id="micToggleBtn" class="small-btn" type="button" aria-pressed="false">Stop mic</button>
     </div>
     <form id="typeForm" class="row" autocomplete="off">
       <label for="typeInput">Type a command</label>
@@ -753,6 +755,7 @@ const mic = {
   starting: false,     // start() was called, waiting for onstart
   blocked: false,      // permission denied or no microphone
   blockedSpoken: false,
+  userPaused: false,   // turned off with the "Stop mic" demo button
   finalText: '',       // finished words in the current sentence
   interimText: '',     // words still being recognized
   altTexts: [],        // other possible readings (used only for guessing)
@@ -791,7 +794,7 @@ function setupRecognition() {
 }
 
 function shouldListen() {
-  return app.started && !!mic.rec && !mic.blocked && !tts.speaking;
+  return app.started && !!mic.rec && !mic.blocked && !mic.userPaused && !tts.speaking;
 }
 
 function startListening() {
@@ -1520,6 +1523,7 @@ const el = {
   demo: document.getElementById('demoMode'),
   jump: document.getElementById('jumpSelect'),
   reset: document.getElementById('resetBtn'),
+  micToggle: document.getElementById('micToggleBtn'),
   typeForm: document.getElementById('typeForm'),
   typeInput: document.getElementById('typeInput'),
   log: document.getElementById('log'),
@@ -1562,6 +1566,7 @@ function renderStatus() {
     if (tts.speaking) { text = 'Talking…'; cls = 'speaking'; }
     else if (!SpeechRec) text = 'Typing only';
     else if (mic.blocked) text = 'Microphone blocked';
+    else if (mic.userPaused) text = 'Microphone off';
     else if (mic.running) { text = 'Listening…'; cls = 'listening'; }
     else text = 'Starting microphone…';
   }
@@ -1719,6 +1724,22 @@ function onReset() {
   if (app.started) say('What would you like to cook?');
 }
 
+// Demo: turn the microphone off or back on. Talking and typed commands still work while it's off.
+function onMicToggle() {
+  mic.userPaused = !mic.userPaused;
+  if (mic.userPaused) {
+    clearHeard();          // drop any half-heard sentence
+    mic.discard = true;
+    pauseListening();
+    showCaption('', false);
+  } else if (!tts.speaking) {
+    startListening();
+  }
+  el.micToggle.textContent = mic.userPaused ? 'Resume mic' : 'Stop mic';
+  el.micToggle.setAttribute('aria-pressed', String(mic.userPaused));
+  renderStatus();
+}
+
 function onDemoToggle() {
   saveJSON(STORAGE_KEYS.demo, el.demo.checked);
   // If the simmer timer is running, restart it with the new length.
@@ -1750,6 +1771,7 @@ function init() {
   el.typeForm.addEventListener('submit', onTypedCommand);
   el.jump.addEventListener('change', onJump);
   el.reset.addEventListener('click', onReset);
+  el.micToggle.addEventListener('click', onMicToggle);
   el.demo.addEventListener('change', onDemoToggle);
 
   if (!SpeechRec) {

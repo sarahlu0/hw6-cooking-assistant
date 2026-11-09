@@ -83,6 +83,8 @@ The screen is secondary. Nothing on it is needed to cook.
 - **Demo mode:** shrinks the 10-minute simmer timer to 20 seconds, with stir reminders every 6 seconds.
 - **Jump to step:** goes straight to any step. Earlier steps count as confirmed.
 - **Reset:** clears saved progress and the burner record, and starts over.
+- **Stop mic / Resume mic:** a small button that turns listening off and on. The app still talks, and
+  typed commands still work while the mic is off.
 - **Type a command:** type anything you would say (for example "done" or "165") if the microphone
   isn't working.
 
